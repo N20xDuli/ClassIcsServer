@@ -9,11 +9,17 @@ router = APIRouter()
 
 @router.post("/", response_model=CourseSchema)
 def create_course(course: CourseCreate, db: Session = Depends(get_db)):
-    db_course = Course(**course.model_dump(), user_id=1)  # 暂时使用固定的 user_id=1
-    db.add(db_course)
-    db.commit()
-    db.refresh(db_course)
-    return db_course
+    try:
+        # 使用 model_dump(mode='python') 确保 datetime 对象保持为 datetime 类型
+        db_course = Course(**course.model_dump(mode='python'), user_id=1)  # 暂时使用固定的 user_id=1
+        db.add(db_course)
+        db.commit()
+        db.refresh(db_course)
+        return db_course
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/", response_model=List[CourseSchema])
 def get_courses(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
@@ -32,7 +38,8 @@ def update_course(course_id: int, course: CourseUpdate, db: Session = Depends(ge
     db_course = db.query(Course).filter(Course.id == course_id, Course.user_id == 1).first()  # 暂时使用固定的 user_id=1
     if db_course is None:
         raise HTTPException(status_code=404, detail="Course not found")
-    for key, value in course.model_dump(exclude_unset=True).items():
+    # 使用 model_dump(mode='python', exclude_unset=True) 确保 datetime 对象保持为 datetime 类型
+    for key, value in course.model_dump(mode='python', exclude_unset=True).items():
         setattr(db_course, key, value)
     db.commit()
     db.refresh(db_course)

@@ -7,24 +7,29 @@ const api = axios.create({
 
 // 课程相关 API
 export const courseApi = {
-  getAll: () => api.get('/courses'),
+  getAll: () => api.get('/courses/'),
   getOne: (id) => api.get(`/courses/${id}`),
-  create: (course) => api.post('/courses', course),
+  create: (course) => api.post('/courses/', course),
   update: (id, course) => api.put(`/courses/${id}`, course),
   delete: (id) => api.delete(`/courses/${id}`),
 };
 
 // 批量编辑相关 API
 export const batchApi = {
-  updateCourses: (courseIds, courseUpdate) => api.put('/batch/courses', { course_ids: courseIds, ...courseUpdate }),
-  deleteCourses: (courseIds) => api.delete('/batch/courses', { data: { course_ids: courseIds } }),
+  updateCourses: (courseIds, courseUpdate) => api.put('/batch/courses/', { course_ids: courseIds, ...courseUpdate }),
+  deleteCourses: (courseIds) => api.delete('/batch/courses/', { data: { course_ids: courseIds } }),
+};
+
+// 教室查询相关 API
+export const classroomApi = {
+  queryAvailable: (params) => api.get('/classroom/available/', { params }),
 };
 
 // 用户相关 API
 export const userApi = {
-  getAll: () => api.get('/users'),
+  getAll: () => api.get('/users/'),
   getOne: (id) => api.get(`/users/${id}`),
-  create: (user) => api.post('/users', user),
+  create: (user) => api.post('/users/', user),
   update: (id, user) => api.put(`/users/${id}`, user),
   delete: (id) => api.delete(`/users/${id}`),
 };
