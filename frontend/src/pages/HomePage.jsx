@@ -4,36 +4,65 @@ import CourseForm from '../components/CourseForm';
 import BatchEdit from '../components/BatchEdit';
 import ClassroomQuery from '../components/ClassroomQuery';
 import WeekView from '../components/WeekView';
+import MajorManager from '../components/MajorManager';
 import { useTheme } from '../contexts/ThemeContext';
-import { courseApi } from '../services/api';
+import { courseApi, majorApi, icsApi } from '../services/api';
 
 const HomePage = () => {
-  const { colors, isDarkMode, toggleDarkMode } = useTheme();
+  const { colors, glass, animation, isDarkMode, toggleDarkMode } = useTheme();
   const [showForm, setShowForm] = useState(false);
   const [showBatchEdit, setShowBatchEdit] = useState(false);
   const [showClassroomQuery, setShowClassroomQuery] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [showMajorManager, setShowMajorManager] = useState(false);
   const [currentCourse, setCurrentCourse] = useState(null);
   const [selectedCourses, setSelectedCourses] = useState([]);
   const [refresh, setRefresh] = useState(false);
   const [courses, setCourses] = useState([]);
+  const [majors, setMajors] = useState([]);
+  const [currentMajor, setCurrentMajor] = useState(null);
   const [icsUrl, setIcsUrl] = useState('');
   const [copied, setCopied] = useState(false);
   const [importData, setImportData] = useState('');
-  const [viewMode, setViewMode] = useState('week'); // 'week' or 'list'
+  const [viewMode, setViewMode] = useState('week');
+  const [hoveredButton, setHoveredButton] = useState(null);
+
+  useEffect(() => {
+    fetchMajors();
+  }, []);
 
   useEffect(() => {
     fetchCourses();
-    const baseUrl = window.location.origin;
-    setIcsUrl(`${baseUrl}/api/ics/subscribe/1`);
-  }, [refresh]);
+    updateIcsUrl();
+  }, [refresh, currentMajor]);
+
+  const fetchMajors = async () => {
+    try {
+      const response = await majorApi.getAll();
+      setMajors(response.data);
+      if (response.data.length > 0 && !currentMajor) {
+        setCurrentMajor(response.data[0]);
+      }
+    } catch (error) {
+      console.error('Failed to fetch majors:', error);
+    }
+  };
 
   const fetchCourses = async () => {
     try {
-      const response = await courseApi.getAll();
+      const response = await courseApi.getAll(currentMajor?.id);
       setCourses(response.data);
     } catch (error) {
       console.error('Failed to fetch courses:', error);
+    }
+  };
+
+  const updateIcsUrl = () => {
+    const baseUrl = window.location.origin;
+    if (currentMajor) {
+      setIcsUrl(`${baseUrl}/api/ics/majors/${currentMajor.id}/subscribe`);
+    } else {
+      setIcsUrl(`${baseUrl}/api/ics/subscribe/1`);
     }
   };
 
@@ -113,7 +142,7 @@ const HomePage = () => {
     try {
       const events = parseICS(importData);
       for (const event of events) {
-        await courseApi.create(event);
+        await courseApi.create({ ...event, major_id: currentMajor?.id });
       }
       setRefresh(!refresh);
       setShowImportModal(false);
@@ -179,24 +208,159 @@ const HomePage = () => {
     return dateStr;
   };
 
+  // Glass card style
+  const glassCardStyle = {
+    background: glass.surface.primary,
+    backdropFilter: glass.blur.lg,
+    WebkitBackdropFilter: glass.blur.lg,
+    border: `1px solid ${glass.border.medium}`,
+    borderRadius: '20px',
+    boxShadow: `${glass.shadow.md}, ${glass.shadow.inner}`,
+    position: 'relative',
+    overflow: 'hidden',
+  };
+
+  const glassButtonStyle = (color = colors.primary, isActive = false) => ({
+    background: isActive 
+      ? `linear-gradient(135deg, ${color}dd, ${color})`
+      : glass.surface.secondary,
+    backdropFilter: glass.blur.md,
+    border: `1px solid ${isActive ? color + '60' : glass.border.medium}`,
+    borderRadius: '14px',
+    color: isActive ? 'white' : colors.textPrimary,
+    fontWeight: '600',
+    fontSize: '14px',
+    cursor: 'pointer',
+    transition: `all ${animation.duration.normal} ${animation.spring}`,
+    position: 'relative',
+    overflow: 'hidden',
+    boxShadow: isActive ? `0 4px 20px ${color}40` : 'none',
+  });
+
+  const statCardStyle = (accentColor) => ({
+    ...glassCardStyle,
+    padding: '24px',
+    transition: `all ${animation.duration.normal} ${animation.spring}`,
+  });
+
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: colors.background }}>
+    <div style={{ 
+      minHeight: '100vh', 
+      background: isDarkMode 
+        ? 'linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 50%, #16213e 100%)'
+        : 'linear-gradient(135deg, #f0f2f5 0%, #e8ecf1 50%, #f5f7fa 100%)',
+      position: 'relative',
+    }}>
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes slideUp {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes shimmer {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
+        }
+        @keyframes float {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-6px); }
+        }
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.7; }
+        }
+        @keyframes glow {
+          0%, 100% { box-shadow: 0 0 20px ${colors.primary}30; }
+          50% { box-shadow: 0 0 40px ${colors.primary}50; }
+        }
+        .shimmer-effect::after {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: ${glass.gradient.shimmer};
+          animation: shimmer 3s infinite;
+          pointer-events: none;
+        }
+        .btn-press:active {
+          transform: scale(0.96) !important;
+        }
+        .card-hover {
+          transition: all ${animation.duration.normal} ${animation.spring};
+        }
+        .card-hover:hover {
+          transform: translateY(-6px) scale(1.02);
+          box-shadow: ${glass.shadow.lg}, 0 0 50px ${colors.primary}25;
+        }
+        .input-glass:focus {
+          border-color: ${colors.primary};
+          box-shadow: 0 0 0 4px ${colors.primary}20, inset 0 1px 2px rgba(0,0,0,0.05);
+        }
+        .select-glass {
+          appearance: none;
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236B7280' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+          background-repeat: no-repeat;
+          background-position: right 12px center;
+          padding-right: 36px;
+        }
+      `}</style>
+
+      {/* Background decorative elements */}
+      <div style={{
+        position: 'fixed',
+        top: '10%',
+        left: '5%',
+        width: '400px',
+        height: '400px',
+        background: `radial-gradient(circle, ${colors.primary}15 0%, transparent 70%)`,
+        borderRadius: '50%',
+        pointerEvents: 'none',
+        filter: 'blur(60px)',
+        animation: 'float 8s ease-in-out infinite',
+      }} />
+      <div style={{
+        position: 'fixed',
+        bottom: '10%',
+        right: '5%',
+        width: '300px',
+        height: '300px',
+        background: `radial-gradient(circle, ${colors.purple}15 0%, transparent 70%)`,
+        borderRadius: '50%',
+        pointerEvents: 'none',
+        filter: 'blur(50px)',
+        animation: 'float 10s ease-in-out infinite reverse',
+      }} />
+
       {/* Header */}
-      <header style={{ backgroundColor: colors.surface, borderBottom: `1px solid ${colors.border}` }}>
-        <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '16px 24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
+      <header style={{ 
+        background: glass.surface.elevated,
+        backdropFilter: glass.blur.xl,
+        borderBottom: `1px solid ${glass.border.medium}`,
+        position: 'sticky',
+        top: 0,
+        zIndex: 100,
+      }}>
+        <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '20px 28px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '20px' }}>
             {/* Logo */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
               <div style={{ 
-                width: '40px', 
-                height: '40px', 
-                backgroundColor: colors.primary, 
-                borderRadius: '8px',
+                width: '48px', 
+                height: '48px', 
+                background: `linear-gradient(135deg, ${colors.primary}, ${colors.indigo})`,
+                borderRadius: '16px',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center'
+                justifyContent: 'center',
+                boxShadow: `0 8px 30px ${colors.primary}50`,
+                animation: 'float 4s ease-in-out infinite',
               }}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5">
                   <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
                   <line x1="16" y1="2" x2="16" y2="6"></line>
                   <line x1="8" y1="2" x2="8" y2="6"></line>
@@ -204,9 +368,69 @@ const HomePage = () => {
                 </svg>
               </div>
               <div>
-                <h1 style={{ fontSize: '20px', fontWeight: 'bold', color: colors.textPrimary, margin: 0 }}>ClassIcs</h1>
-                <p style={{ fontSize: '12px', color: colors.textSecondary, margin: 0 }}>智能课表管理系统</p>
+                <h1 style={{ fontSize: '24px', fontWeight: '800', color: colors.textPrimary, margin: 0, letterSpacing: '-0.5px' }}>ClassIcs</h1>
+                <p style={{ fontSize: '13px', color: colors.textSecondary, margin: '2px 0 0 0', fontWeight: '500' }}>智能课表管理系统</p>
               </div>
+            </div>
+            
+            {/* Major Selector */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ position: 'relative' }}>
+                <select
+                  value={currentMajor?.id || ''}
+                  onChange={(e) => {
+                    const major = majors.find(m => m.id === parseInt(e.target.value));
+                    setCurrentMajor(major);
+                    setSelectedCourses([]);
+                  }}
+                  style={{
+                    padding: '12px 40px 12px 18px',
+                    border: `1px solid ${glass.border.medium}`,
+                    borderRadius: '14px',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    background: glass.surface.secondary,
+                    backdropFilter: glass.blur.md,
+                    color: colors.textPrimary,
+                    minWidth: '180px',
+                    cursor: 'pointer',
+                    outline: 'none',
+                    transition: `all ${animation.duration.fast} ease`,
+                  }}
+                  className="select-glass input-glass"
+                >
+                  <option value="">选择专业</option>
+                  {majors.map(major => (
+                    <option key={major.id} value={major.id}>{major.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <button
+                onClick={() => setShowMajorManager(true)}
+                style={{
+                  ...glassButtonStyle(colors.indigo),
+                  padding: '12px 20px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
+                className="btn-press"
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = `0 8px 25px ${colors.indigo}40`;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M12 14l9-5-9-5-9 5 9 5z"></path>
+                  <path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"></path>
+                </svg>
+                管理专业
+              </button>
             </div>
             
             {/* Right side controls */}
@@ -215,13 +439,14 @@ const HomePage = () => {
               <div style={{ 
                 display: 'flex', 
                 alignItems: 'center', 
-                gap: '8px',
-                backgroundColor: isDarkMode ? '#334155' : '#f9fafb',
-                padding: '8px 12px',
-                borderRadius: '6px',
-                border: `1px solid ${colors.border}`
+                gap: '10px',
+                background: glass.surface.secondary,
+                backdropFilter: glass.blur.md,
+                padding: '10px 14px',
+                borderRadius: '14px',
+                border: `1px solid ${glass.border.medium}`,
               }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={colors.textSecondary} strokeWidth="2">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={colors.textSecondary} strokeWidth="2">
                   <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
                   <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
                 </svg>
@@ -233,23 +458,27 @@ const HomePage = () => {
                     background: 'transparent', 
                     border: 'none', 
                     fontSize: '13px', 
+                    fontWeight: '500',
                     color: colors.textSecondary,
-                    width: '200px',
-                    outline: 'none'
+                    width: '180px',
+                    outline: 'none',
                   }}
                 />
                 <button
                   onClick={handleCopyIcsUrl}
                   style={{
-                    padding: '4px 12px',
+                    padding: '8px 16px',
                     fontSize: '12px',
-                    fontWeight: '500',
-                    borderRadius: '4px',
+                    fontWeight: '700',
+                    borderRadius: '10px',
                     border: 'none',
                     cursor: 'pointer',
-                    backgroundColor: copied ? colors.success : colors.primary,
-                    color: 'white'
+                    background: copied ? colors.success : colors.primary,
+                    color: 'white',
+                    boxShadow: copied ? `0 4px 15px ${colors.success}50` : `0 4px 15px ${colors.primary}40`,
+                    transition: `all ${animation.duration.fast} ease`,
                   }}
+                  className="btn-press"
                 >
                   {copied ? '已复制!' : '复制'}
                 </button>
@@ -262,17 +491,28 @@ const HomePage = () => {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: '8px',
-                  border: `1px solid ${colors.border}`,
-                  backgroundColor: colors.surface,
-                  cursor: 'pointer'
+                  width: '46px',
+                  height: '46px',
+                  borderRadius: '14px',
+                  border: `1px solid ${glass.border.medium}`,
+                  background: glass.surface.secondary,
+                  backdropFilter: glass.blur.md,
+                  cursor: 'pointer',
+                  transition: `all ${animation.duration.normal} ${animation.spring}`,
                 }}
+                className="btn-press"
                 title={isDarkMode ? '切换到浅色模式' : '切换到深色模式'}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'rotate(15deg) scale(1.1)';
+                  e.currentTarget.style.boxShadow = glass.shadow.glow;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'rotate(0deg) scale(1)';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
               >
                 {isDarkMode ? (
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={colors.textPrimary} strokeWidth="2">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={colors.textPrimary} strokeWidth="2">
                     <circle cx="12" cy="12" r="5"></circle>
                     <line x1="12" y1="1" x2="12" y2="3"></line>
                     <line x1="12" y1="21" x2="12" y2="23"></line>
@@ -284,7 +524,7 @@ const HomePage = () => {
                     <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
                   </svg>
                 ) : (
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={colors.textPrimary} strokeWidth="2">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={colors.textPrimary} strokeWidth="2">
                     <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
                   </svg>
                 )}
@@ -295,17 +535,28 @@ const HomePage = () => {
       </header>
 
       {/* Main Content */}
-      <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '24px' }}>
+      <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '28px' }}>
         {/* Stats */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
-          <div style={{ backgroundColor: colors.surface, padding: '20px', borderRadius: '8px', border: `1px solid ${colors.border}` }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px', marginBottom: '28px' }}>
+          <div className="card-hover" style={statCardStyle(colors.primary)}>
+            <div className="shimmer-effect" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0.2 }} />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative', zIndex: 1 }}>
               <div>
-                <p style={{ fontSize: '14px', color: colors.textSecondary, margin: '0 0 4px 0' }}>总课程数</p>
-                <p style={{ fontSize: '28px', fontWeight: 'bold', color: colors.textPrimary, margin: 0 }}>{courses.length}</p>
+                <p style={{ fontSize: '14px', color: colors.textSecondary, margin: '0 0 6px 0', fontWeight: '500' }}>总课程数</p>
+                <p style={{ fontSize: '36px', fontWeight: '800', color: colors.textPrimary, margin: 0, letterSpacing: '-1px' }}>{courses.length}</p>
               </div>
-              <div style={{ width: '48px', height: '48px', backgroundColor: isDarkMode ? '#1e3a5f' : '#dbeafe', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={colors.primary} strokeWidth="2">
+              <div style={{ 
+                width: '56px', 
+                height: '56px', 
+                background: `linear-gradient(135deg, ${colors.primary}30, ${colors.primary}10)`,
+                backdropFilter: glass.blur.md,
+                borderRadius: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                border: `1px solid ${colors.primary}30`,
+              }}>
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={colors.primary} strokeWidth="2">
                   <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
                   <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
                 </svg>
@@ -313,30 +564,52 @@ const HomePage = () => {
             </div>
           </div>
 
-          <div style={{ backgroundColor: colors.surface, padding: '20px', borderRadius: '8px', border: `1px solid ${colors.border}` }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div className="card-hover" style={statCardStyle(colors.success)}>
+            <div className="shimmer-effect" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0.2 }} />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative', zIndex: 1 }}>
               <div>
-                <p style={{ fontSize: '14px', color: colors.textSecondary, margin: '0 0 4px 0' }}>已选择</p>
-                <p style={{ fontSize: '28px', fontWeight: 'bold', color: colors.textPrimary, margin: 0 }}>{selectedCourses.length}</p>
+                <p style={{ fontSize: '14px', color: colors.textSecondary, margin: '0 0 6px 0', fontWeight: '500' }}>已选择</p>
+                <p style={{ fontSize: '36px', fontWeight: '800', color: colors.textPrimary, margin: 0, letterSpacing: '-1px' }}>{selectedCourses.length}</p>
               </div>
-              <div style={{ width: '48px', height: '48px', backgroundColor: isDarkMode ? '#14532d' : '#d1fae5', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={colors.success} strokeWidth="2">
+              <div style={{ 
+                width: '56px', 
+                height: '56px', 
+                background: `linear-gradient(135deg, ${colors.success}30, ${colors.success}10)`,
+                backdropFilter: glass.blur.md,
+                borderRadius: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                border: `1px solid ${colors.success}30`,
+              }}>
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={colors.success} strokeWidth="2">
                   <polyline points="20 6 9 17 4 12"></polyline>
                 </svg>
               </div>
             </div>
           </div>
 
-          <div style={{ backgroundColor: colors.surface, padding: '20px', borderRadius: '8px', border: `1px solid ${colors.border}` }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div className="card-hover" style={statCardStyle(colors.purple)}>
+            <div className="shimmer-effect" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0.2 }} />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative', zIndex: 1 }}>
               <div>
-                <p style={{ fontSize: '14px', color: colors.textSecondary, margin: '0 0 4px 0' }}>本周课程</p>
-                <p style={{ fontSize: '28px', fontWeight: 'bold', color: colors.textPrimary, margin: 0 }}>
+                <p style={{ fontSize: '14px', color: colors.textSecondary, margin: '0 0 6px 0', fontWeight: '500' }}>本周课程</p>
+                <p style={{ fontSize: '36px', fontWeight: '800', color: colors.textPrimary, margin: 0, letterSpacing: '-1px' }}>
                   {courses.filter(c => c.day_of_week >= 1 && c.day_of_week <= 5).length}
                 </p>
               </div>
-              <div style={{ width: '48px', height: '48px', backgroundColor: isDarkMode ? '#581c87' : '#f3e8ff', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={colors.purple} strokeWidth="2">
+              <div style={{ 
+                width: '56px', 
+                height: '56px', 
+                background: `linear-gradient(135deg, ${colors.purple}30, ${colors.purple}10)`,
+                backdropFilter: glass.blur.md,
+                borderRadius: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                border: `1px solid ${colors.purple}30`,
+              }}>
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={colors.purple} strokeWidth="2">
                   <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
                   <line x1="16" y1="2" x2="16" y2="6"></line>
                   <line x1="8" y1="2" x2="8" y2="6"></line>
@@ -346,16 +619,29 @@ const HomePage = () => {
             </div>
           </div>
 
-          <div style={{ backgroundColor: colors.surface, padding: '20px', borderRadius: '8px', border: `1px solid ${colors.border}` }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div className="card-hover" style={statCardStyle(colors.indigo)}>
+            <div className="shimmer-effect" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0.2 }} />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative', zIndex: 1 }}>
               <div>
-                <p style={{ fontSize: '14px', color: colors.textSecondary, margin: '0 0 4px 0' }}>提醒设置</p>
-                <p style={{ fontSize: '28px', fontWeight: 'bold', color: colors.textPrimary, margin: 0 }}>10分钟</p>
+                <p style={{ fontSize: '14px', color: colors.textSecondary, margin: '0 0 6px 0', fontWeight: '500' }}>当前专业</p>
+                <p style={{ fontSize: '20px', fontWeight: '700', color: colors.textPrimary, margin: 0 }}>
+                  {currentMajor?.name || '未选择'}
+                </p>
               </div>
-              <div style={{ width: '48px', height: '48px', backgroundColor: isDarkMode ? '#7c2d12' : '#fed7aa', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={colors.warning} strokeWidth="2">
-                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-                  <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+              <div style={{ 
+                width: '56px', 
+                height: '56px', 
+                background: `linear-gradient(135deg, ${colors.indigo}30, ${colors.indigo}10)`,
+                backdropFilter: glass.blur.md,
+                borderRadius: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                border: `1px solid ${colors.indigo}30`,
+              }}>
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={colors.indigo} strokeWidth="2">
+                  <path d="M12 14l9-5-9-5-9 5 9 5z"></path>
+                  <path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"></path>
                 </svg>
               </div>
             </div>
@@ -363,25 +649,38 @@ const HomePage = () => {
         </div>
 
         {/* Action Buttons */}
-        <div style={{ backgroundColor: colors.surface, padding: '20px', borderRadius: '8px', border: `1px solid ${colors.border}`, marginBottom: '24px' }}>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center' }}>
+        <div style={{ 
+          ...glassCardStyle,
+          padding: '20px 24px',
+          marginBottom: '24px',
+        }}>
+          <div className="shimmer-effect" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0.15 }} />
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center', position: 'relative', zIndex: 1 }}>
             <button 
               onClick={handleAddCourse}
+              disabled={!currentMajor}
               style={{
+                ...glassButtonStyle(colors.primary, false),
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px',
-                padding: '10px 16px',
-                backgroundColor: colors.primary,
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '14px',
-                fontWeight: '500',
-                cursor: 'pointer'
+                gap: '8px',
+                padding: '12px 20px',
+                opacity: currentMajor ? 1 : 0.5,
+                cursor: currentMajor ? 'pointer' : 'not-allowed',
+              }}
+              className="btn-press"
+              onMouseEnter={(e) => {
+                if (currentMajor) {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = `0 8px 25px ${colors.primary}50`;
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = 'none';
               }}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                 <line x1="12" y1="5" x2="12" y2="19"></line>
                 <line x1="5" y1="12" x2="19" y2="12"></line>
               </svg>
@@ -392,20 +691,27 @@ const HomePage = () => {
               onClick={handleBatchEdit} 
               disabled={selectedCourses.length === 0}
               style={{
+                ...glassButtonStyle(colors.success, false),
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px',
-                padding: '10px 16px',
-                backgroundColor: selectedCourses.length === 0 ? colors.border : colors.success,
-                color: selectedCourses.length === 0 ? colors.textMuted : 'white',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '14px',
-                fontWeight: '500',
-                cursor: selectedCourses.length === 0 ? 'not-allowed' : 'pointer'
+                gap: '8px',
+                padding: '12px 20px',
+                opacity: selectedCourses.length === 0 ? 0.5 : 1,
+                cursor: selectedCourses.length === 0 ? 'not-allowed' : 'pointer',
+              }}
+              className="btn-press"
+              onMouseEnter={(e) => {
+                if (selectedCourses.length > 0) {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = `0 8px 25px ${colors.success}50`;
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = 'none';
               }}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
               </svg>
@@ -416,20 +722,27 @@ const HomePage = () => {
               onClick={handleBatchDelete}
               disabled={selectedCourses.length === 0}
               style={{
+                ...glassButtonStyle(colors.danger, false),
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px',
-                padding: '10px 16px',
-                backgroundColor: selectedCourses.length === 0 ? colors.border : colors.danger,
-                color: selectedCourses.length === 0 ? colors.textMuted : 'white',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '14px',
-                fontWeight: '500',
-                cursor: selectedCourses.length === 0 ? 'not-allowed' : 'pointer'
+                gap: '8px',
+                padding: '12px 20px',
+                opacity: selectedCourses.length === 0 ? 0.5 : 1,
+                cursor: selectedCourses.length === 0 ? 'not-allowed' : 'pointer',
+              }}
+              className="btn-press"
+              onMouseEnter={(e) => {
+                if (selectedCourses.length > 0) {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = `0 8px 25px ${colors.danger}50`;
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = 'none';
               }}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <polyline points="3 6 5 6 21 6"></polyline>
                 <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
               </svg>
@@ -439,20 +752,27 @@ const HomePage = () => {
             <button 
               onClick={handleClassroomQuery}
               style={{
+                ...glassButtonStyle(colors.purple, showClassroomQuery),
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px',
-                padding: '10px 16px',
-                backgroundColor: showClassroomQuery ? (isDarkMode ? '#4c1d95' : '#f3e8ff') : colors.purple,
-                color: showClassroomQuery ? (isDarkMode ? '#d8b4fe' : '#7c3aed') : 'white',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '14px',
-                fontWeight: '500',
-                cursor: 'pointer'
+                gap: '8px',
+                padding: '12px 20px',
+              }}
+              className="btn-press"
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                if (!showClassroomQuery) {
+                  e.currentTarget.style.boxShadow = `0 8px 25px ${colors.purple}50`;
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                if (!showClassroomQuery) {
+                  e.currentTarget.style.boxShadow = 'none';
+                }
               }}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
                 <polyline points="9 22 9 12 15 12 15 22"></polyline>
               </svg>
@@ -461,22 +781,30 @@ const HomePage = () => {
 
             <button 
               onClick={() => setShowImportModal(true)}
+              disabled={!currentMajor}
               style={{
+                ...glassButtonStyle(colors.indigo, false),
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px',
-                padding: '10px 16px',
-                backgroundColor: colors.indigo,
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '14px',
-                fontWeight: '500',
-                cursor: 'pointer',
-                marginLeft: 'auto'
+                gap: '8px',
+                padding: '12px 20px',
+                marginLeft: 'auto',
+                opacity: currentMajor ? 1 : 0.5,
+                cursor: currentMajor ? 'pointer' : 'not-allowed',
+              }}
+              className="btn-press"
+              onMouseEnter={(e) => {
+                if (currentMajor) {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = `0 8px 25px ${colors.indigo}50`;
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = 'none';
               }}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                 <polyline points="17 8 12 3 7 8"></polyline>
                 <line x1="12" y1="3" x2="12" y2="15"></line>
@@ -487,34 +815,26 @@ const HomePage = () => {
         </div>
 
         {/* View Toggle */}
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
+        <div style={{ display: 'flex', gap: '10px', marginBottom: '24px' }}>
           <button
             onClick={() => setViewMode('week')}
             style={{
-              padding: '8px 16px',
-              backgroundColor: viewMode === 'week' ? colors.primary : colors.surface,
-              color: viewMode === 'week' ? 'white' : colors.textPrimary,
-              border: `1px solid ${viewMode === 'week' ? colors.primary : colors.border}`,
-              borderRadius: '6px',
-              fontSize: '14px',
-              fontWeight: '500',
-              cursor: 'pointer'
+              ...glassButtonStyle(colors.primary, viewMode === 'week'),
+              padding: '10px 24px',
+              fontWeight: '700',
             }}
+            className="btn-press"
           >
             一周视图
           </button>
           <button
             onClick={() => setViewMode('list')}
             style={{
-              padding: '8px 16px',
-              backgroundColor: viewMode === 'list' ? colors.primary : colors.surface,
-              color: viewMode === 'list' ? 'white' : colors.textPrimary,
-              border: `1px solid ${viewMode === 'list' ? colors.primary : colors.border}`,
-              borderRadius: '6px',
-              fontSize: '14px',
-              fontWeight: '500',
-              cursor: 'pointer'
+              ...glassButtonStyle(colors.primary, viewMode === 'list'),
+              padding: '10px 24px',
+              fontWeight: '700',
             }}
+            className="btn-press"
           >
             列表视图
           </button>
@@ -528,23 +848,30 @@ const HomePage = () => {
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: 'rgba(0,0,0,0.5)',
+            background: isDarkMode 
+              ? 'rgba(10, 10, 15, 0.9)'
+              : 'rgba(240, 242, 245, 0.9)',
+            backdropFilter: glass.blur.xl,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            zIndex: 1000
+            zIndex: 1000,
+            animation: `fadeIn ${animation.duration.normal} ease`,
           }}>
             <div style={{
-              backgroundColor: colors.surface,
-              borderRadius: '8px',
-              padding: '24px',
+              ...glassCardStyle,
+              padding: '32px',
               width: '90%',
               maxWidth: '600px',
               maxHeight: '80vh',
               overflow: 'auto',
-              border: `1px solid ${colors.border}`
+              animation: `slideUp ${animation.duration.slow} ${animation.spring}`,
             }}>
-              <h2 style={{ fontSize: '20px', fontWeight: 'bold', color: colors.textPrimary, marginBottom: '16px' }}>导入 ICS 课程</h2>
+              <div className="shimmer-effect" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0.15 }} />
+              <h2 style={{ fontSize: '22px', fontWeight: '800', color: colors.textPrimary, marginBottom: '16px', position: 'relative', zIndex: 1 }}>导入 ICS 课程</h2>
+              <p style={{ fontSize: '14px', color: colors.textSecondary, marginBottom: '16px', position: 'relative', zIndex: 1 }}>
+                导入到专业: <strong style={{ color: colors.textPrimary }}>{currentMajor?.name}</strong>
+              </p>
               <textarea
                 value={importData}
                 onChange={(e) => setImportData(e.target.value)}
@@ -552,43 +879,40 @@ const HomePage = () => {
                 style={{
                   width: '100%',
                   height: '200px',
-                  padding: '12px',
-                  border: `1px solid ${colors.border}`,
-                  borderRadius: '6px',
+                  padding: '16px',
+                  border: `1px solid ${glass.border.medium}`,
+                  borderRadius: '14px',
                   fontSize: '14px',
                   fontFamily: 'monospace',
                   resize: 'vertical',
-                  backgroundColor: colors.surface,
-                  color: colors.textPrimary
+                  background: glass.surface.secondary,
+                  backdropFilter: glass.blur.md,
+                  color: colors.textPrimary,
+                  outline: 'none',
                 }}
+                className="input-glass"
               />
-              <p style={{ fontSize: '12px', color: colors.textSecondary, marginTop: '8px' }}>
+              <p style={{ fontSize: '13px', color: colors.textSecondary, marginTop: '12px', position: 'relative', zIndex: 1 }}>
                 支持标准 ICS 格式，系统会自动解析课程名称、时间、地点等信息。
               </p>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '24px', position: 'relative', zIndex: 1 }}>
                 <button 
                   onClick={() => setShowImportModal(false)}
                   style={{
-                    padding: '8px 16px',
-                    backgroundColor: colors.border,
-                    color: colors.textPrimary,
-                    border: 'none',
-                    borderRadius: '6px',
-                    cursor: 'pointer'
+                    ...glassButtonStyle(),
+                    padding: '12px 24px',
                   }}
+                  className="btn-press"
                 >
                   取消
                 </button>
                 <button 
                   onClick={handleImportIcs}
                   style={{
-                    padding: '8px 16px',
-                    backgroundColor: colors.primary,
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '6px',
-                    cursor: 'pointer'
+                    ...glassButtonStyle(colors.primary, true),
+                    padding: '12px 28px',
                   }}
+                  className="btn-press"
                 >
                   导入
                 </button>
@@ -597,11 +921,24 @@ const HomePage = () => {
           </div>
         )}
 
+        {/* Major Manager Modal */}
+        {showMajorManager && (
+          <MajorManager
+            majors={majors}
+            onClose={() => setShowMajorManager(false)}
+            onUpdate={() => {
+              fetchMajors();
+              setRefresh(!refresh);
+            }}
+          />
+        )}
+
         {/* Forms */}
         {showForm && (
-          <div style={{ marginBottom: '24px' }}>
+          <div style={{ marginBottom: '24px', animation: `slideUp ${animation.duration.normal} ease` }}>
             <CourseForm
               course={currentCourse}
+              currentMajor={currentMajor}
               onClose={handleCloseForm}
               onSubmit={handleSubmit}
             />
@@ -609,7 +946,7 @@ const HomePage = () => {
         )}
 
         {showBatchEdit && (
-          <div style={{ marginBottom: '24px' }}>
+          <div style={{ marginBottom: '24px', animation: `slideUp ${animation.duration.normal} ease` }}>
             <BatchEdit
               selectedCourses={selectedCourses}
               onClose={handleCloseBatchEdit}
@@ -619,32 +956,42 @@ const HomePage = () => {
         )}
 
         {showClassroomQuery && (
-          <div style={{ marginBottom: '24px' }}>
+          <div style={{ marginBottom: '24px', animation: `slideUp ${animation.duration.normal} ease` }}>
             <ClassroomQuery />
           </div>
         )}
 
         {/* Main View */}
-        {viewMode === 'week' ? (
-          <WeekView courses={courses} />
-        ) : (
-          <div style={{ backgroundColor: colors.surface, borderRadius: '8px', border: `1px solid ${colors.border}` }}>
-            <CourseList 
-              key={refresh} 
-              onSelectCourses={handleSelectCourses}
-              onEditCourse={handleEditCourse}
-              courses={courses}
-            />
-          </div>
-        )}
+        <div style={{ animation: `fadeIn ${animation.duration.slow} ease` }}>
+          {viewMode === 'week' ? (
+            <WeekView courses={courses} onEditCourse={handleEditCourse} />
+          ) : (
+            <div style={{ ...glassCardStyle, padding: '4px' }}>
+              <div className="shimmer-effect" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0.1 }} />
+              <div style={{ position: 'relative', zIndex: 1 }}>
+                <CourseList 
+                  key={refresh} 
+                  onSelectCourses={handleSelectCourses}
+                  onEditCourse={handleEditCourse}
+                  courses={courses}
+                />
+              </div>
+            </div>
+          )}
+        </div>
       </main>
 
       {/* Footer */}
-      <footer style={{ backgroundColor: colors.surface, borderTop: `1px solid ${colors.border}`, marginTop: '48px' }}>
-        <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '16px 24px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: colors.textSecondary }}>
-            <p>ClassIcs - 智能课表管理系统</p>
-            <p>支持 iCalendar 订阅格式</p>
+      <footer style={{ 
+        background: glass.surface.elevated,
+        backdropFilter: glass.blur.xl,
+        borderTop: `1px solid ${glass.border.medium}`,
+        marginTop: '48px',
+      }}>
+        <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '24px 28px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '14px', color: colors.textSecondary }}>
+            <p style={{ margin: 0, fontWeight: '500' }}>ClassIcs - 智能课表管理系统</p>
+            <p style={{ margin: 0, fontWeight: '500' }}>支持 iCalendar 订阅格式</p>
           </div>
         </div>
       </footer>

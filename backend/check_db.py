@@ -1,0 +1,10 @@
+import sqlite3
+conn = sqlite3.connect('classics.db')
+cursor = conn.cursor()
+cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+print('Tables:', cursor.fetchall())
+cursor.execute('PRAGMA table_info(courses)')
+print('Courses columns:', cursor.fetchall())
+cursor.execute('PRAGMA table_info(majors)')
+print('Majors columns:', cursor.fetchall())
+conn.close()

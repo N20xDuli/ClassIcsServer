@@ -7,7 +7,8 @@ class Course(Base):
     __tablename__ = "courses"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"))
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    major_id = Column(Integer, ForeignKey("majors.id"), nullable=True)  # 关联专业
     name = Column(String, index=True)
     teacher = Column(String)
     location = Column(String)
@@ -20,3 +21,4 @@ class Course(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     user = relationship("User", backref="courses")
+    major = relationship("Major", back_populates="courses")

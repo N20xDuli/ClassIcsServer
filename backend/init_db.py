@@ -1,5 +1,5 @@
 from app.database import engine, Base
-from app.models import User, Course, Location
+from app.models import User, Course, Location, Major
 
 # 创建所有表
 Base.metadata.create_all(bind=engine)

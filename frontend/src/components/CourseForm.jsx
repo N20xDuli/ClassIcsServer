@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { courseApi } from '../services/api';
 
-const CourseForm = ({ course, onClose, onSubmit }) => {
-  const { colors } = useTheme();
+const CourseForm = ({ course, currentMajor, onClose, onSubmit }) => {
+  const { colors, glass, animation, isDarkMode } = useTheme();
   const [formData, setFormData] = useState({
     name: course?.name || '',
     teacher: course?.teacher || '',
@@ -13,6 +13,7 @@ const CourseForm = ({ course, onClose, onSubmit }) => {
     day_of_week: course?.day_of_week || 1,
     is_odd_week: course?.is_odd_week !== undefined ? course.is_odd_week : null,
     reminder_time: course?.reminder_time || 10,
+    major_id: course?.major_id || currentMajor?.id || null,
   });
   const [loading, setLoading] = useState(false);
 
@@ -31,7 +32,8 @@ const CourseForm = ({ course, onClose, onSubmit }) => {
     try {
       const submitData = {
         ...formData,
-        is_odd_week: formData.is_odd_week === '' ? null : formData.is_odd_week === 'true'
+        is_odd_week: formData.is_odd_week === '' ? null : formData.is_odd_week === 'true',
+        major_id: formData.major_id || currentMajor?.id
       };
 
       if (course) {
@@ -54,22 +56,122 @@ const CourseForm = ({ course, onClose, onSubmit }) => {
     return days[day] || '未知';
   };
 
+  const glassCardStyle = {
+    background: glass.surface.primary,
+    backdropFilter: glass.blur.lg,
+    WebkitBackdropFilter: glass.blur.lg,
+    border: `1px solid ${glass.border.medium}`,
+    borderRadius: '20px',
+    boxShadow: `${glass.shadow.md}, ${glass.shadow.inner}`,
+    position: 'relative',
+    overflow: 'hidden',
+  };
+
+  const inputStyle = {
+    width: '100%',
+    padding: '14px 16px',
+    border: `1px solid ${glass.border.medium}`,
+    borderRadius: '12px',
+    fontSize: '15px',
+    background: glass.surface.secondary,
+    backdropFilter: glass.blur.md,
+    color: colors.textPrimary,
+    transition: `all ${animation.duration.fast} ease`,
+    outline: 'none',
+  };
+
+  const glassButtonStyle = (color = colors.primary, isActive = false) => ({
+    background: isActive 
+      ? `linear-gradient(135deg, ${color}dd, ${color})`
+      : glass.surface.tertiary,
+    backdropFilter: glass.blur.md,
+    border: `1px solid ${isActive ? color + '60' : glass.border.medium}`,
+    borderRadius: '12px',
+    color: isActive ? 'white' : colors.textPrimary,
+    fontWeight: '600',
+    fontSize: '14px',
+    cursor: 'pointer',
+    transition: `all ${animation.duration.normal} ${animation.spring}`,
+    position: 'relative',
+    overflow: 'hidden',
+    boxShadow: isActive ? `0 4px 20px ${color}40` : 'none',
+  });
+
   return (
-    <div style={{ backgroundColor: colors.surface, borderRadius: '8px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', border: `1px solid ${colors.border}` }}>
+    <div style={{
+      ...glassCardStyle,
+      animation: `slideUp ${animation.duration.slow} ${animation.spring}`,
+    }}>
+      <style>{`
+        @keyframes slideUp {
+          from { opacity: 0; transform: translateY(30px) scale(0.95); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes shimmer {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
+        }
+        @keyframes float {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-5px); }
+        }
+        .shimmer-effect::after {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: ${glass.gradient.shimmer};
+          animation: shimmer 3s infinite;
+          pointer-events: none;
+        }
+        .input-glass:focus {
+          border-color: ${colors.primary};
+          box-shadow: 0 0 0 4px ${colors.primary}20, inset 0 1px 2px rgba(0,0,0,0.05);
+        }
+        .btn-press:active {
+          transform: scale(0.96) !important;
+        }
+      `}</style>
+
+      {/* Shimmer overlay */}
+      <div className="shimmer-effect" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0.15 }} />
+
       {/* Header */}
-      <div style={{ backgroundColor: colors.primary, padding: '16px 24px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+      <div style={{ 
+        background: `linear-gradient(135deg, ${colors.primary}dd, ${colors.indigo}dd)`,
+        padding: '24px 28px',
+        position: 'relative',
+        overflow: 'hidden',
+      }}>
+        {/* Gradient overlay */}
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: glass.gradient.top,
+          pointerEvents: 'none',
+        }} />
+        
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative', zIndex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             <div style={{ 
-              width: '40px', 
-              height: '40px', 
-              backgroundColor: 'rgba(255,255,255,0.2)', 
-              borderRadius: '8px',
+              width: '52px', 
+              height: '52px', 
+              background: 'rgba(255,255,255,0.2)',
+              backdropFilter: glass.blur.md,
+              borderRadius: '16px',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center'
+              justifyContent: 'center',
+              border: '1px solid rgba(255,255,255,0.3)',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
+              animation: 'float 3s ease-in-out infinite',
             }}>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
                 {course ? (
                   <>
                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
@@ -84,15 +186,39 @@ const CourseForm = ({ course, onClose, onSubmit }) => {
               </svg>
             </div>
             <div>
-              <h2 style={{ fontSize: '18px', fontWeight: 'bold', color: 'white', margin: 0 }}>
+              <h2 style={{ fontSize: '22px', fontWeight: '700', color: 'white', margin: 0, textShadow: '0 2px 4px rgba(0,0,0,0.2)' }}>
                 {course ? '编辑课程' : '添加课程'}
               </h2>
-              <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.8)', margin: 0 }}>
-                {course ? '修改课程信息' : '创建新课程'}
+              <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.85)', margin: '4px 0 0 0' }}>
+                {currentMajor?.name ? `专业: ${currentMajor.name}` : '请选择专业'}
               </p>
             </div>
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+          <button 
+            onClick={onClose} 
+            style={{ 
+              background: 'rgba(255,255,255,0.15)',
+              backdropFilter: glass.blur.md,
+              border: '1px solid rgba(255,255,255,0.2)',
+              borderRadius: '12px',
+              width: '44px',
+              height: '44px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              transition: `all ${animation.duration.fast} ease`,
+            }}
+            className="btn-press"
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(255,255,255,0.25)';
+              e.currentTarget.style.transform = 'rotate(90deg)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(255,255,255,0.15)';
+              e.currentTarget.style.transform = 'rotate(0deg)';
+            }}
+          >
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
               <line x1="18" y1="6" x2="6" y2="18"></line>
               <line x1="6" y1="6" x2="18" y2="18"></line>
@@ -102,11 +228,20 @@ const CourseForm = ({ course, onClose, onSubmit }) => {
       </div>
 
       {/* Form */}
-      <form onSubmit={handleSubmit} style={{ padding: '24px' }}>
+      <form onSubmit={handleSubmit} style={{ padding: '28px', position: 'relative', zIndex: 1 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
           {/* Course name */}
           <div style={{ gridColumn: '1 / -1' }}>
-            <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: colors.textPrimary, marginBottom: '6px' }}>
+            <label style={{ 
+              display: 'block', 
+              fontSize: '14px', 
+              fontWeight: '600', 
+              color: colors.textPrimary, 
+              marginBottom: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+            }}>
               课程名称 <span style={{ color: colors.danger }}>*</span>
             </label>
             <input
@@ -116,21 +251,23 @@ const CourseForm = ({ course, onClose, onSubmit }) => {
               onChange={handleChange}
               required
               placeholder="请输入课程名称"
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                border: `1px solid ${colors.border}`,
-                borderRadius: '6px',
-                fontSize: '14px',
-                backgroundColor: colors.surface,
-                color: colors.textPrimary
-              }}
+              style={inputStyle}
+              className="input-glass"
             />
           </div>
 
           {/* Teacher */}
           <div>
-            <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: colors.textPrimary, marginBottom: '6px' }}>
+            <label style={{ 
+              display: 'block', 
+              fontSize: '14px', 
+              fontWeight: '600', 
+              color: colors.textPrimary, 
+              marginBottom: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+            }}>
               教师 <span style={{ color: colors.danger }}>*</span>
             </label>
             <input
@@ -140,21 +277,23 @@ const CourseForm = ({ course, onClose, onSubmit }) => {
               onChange={handleChange}
               required
               placeholder="请输入教师姓名"
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                border: `1px solid ${colors.border}`,
-                borderRadius: '6px',
-                fontSize: '14px',
-                backgroundColor: colors.surface,
-                color: colors.textPrimary
-              }}
+              style={inputStyle}
+              className="input-glass"
             />
           </div>
 
           {/* Location */}
           <div>
-            <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: colors.textPrimary, marginBottom: '6px' }}>
+            <label style={{ 
+              display: 'block', 
+              fontSize: '14px', 
+              fontWeight: '600', 
+              color: colors.textPrimary, 
+              marginBottom: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+            }}>
               地点 <span style={{ color: colors.danger }}>*</span>
             </label>
             <input
@@ -164,21 +303,23 @@ const CourseForm = ({ course, onClose, onSubmit }) => {
               onChange={handleChange}
               required
               placeholder="请输入上课地点"
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                border: `1px solid ${colors.border}`,
-                borderRadius: '6px',
-                fontSize: '14px',
-                backgroundColor: colors.surface,
-                color: colors.textPrimary
-              }}
+              style={inputStyle}
+              className="input-glass"
             />
           </div>
 
           {/* Start time */}
           <div>
-            <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: colors.textPrimary, marginBottom: '6px' }}>
+            <label style={{ 
+              display: 'block', 
+              fontSize: '14px', 
+              fontWeight: '600', 
+              color: colors.textPrimary, 
+              marginBottom: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+            }}>
               开始时间 <span style={{ color: colors.danger }}>*</span>
             </label>
             <input
@@ -187,21 +328,23 @@ const CourseForm = ({ course, onClose, onSubmit }) => {
               value={formData.start_time}
               onChange={handleChange}
               required
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                border: `1px solid ${colors.border}`,
-                borderRadius: '6px',
-                fontSize: '14px',
-                backgroundColor: colors.surface,
-                color: colors.textPrimary
-              }}
+              style={inputStyle}
+              className="input-glass"
             />
           </div>
 
           {/* End time */}
           <div>
-            <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: colors.textPrimary, marginBottom: '6px' }}>
+            <label style={{ 
+              display: 'block', 
+              fontSize: '14px', 
+              fontWeight: '600', 
+              color: colors.textPrimary, 
+              marginBottom: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+            }}>
               结束时间 <span style={{ color: colors.danger }}>*</span>
             </label>
             <input
@@ -210,21 +353,23 @@ const CourseForm = ({ course, onClose, onSubmit }) => {
               value={formData.end_time}
               onChange={handleChange}
               required
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                border: `1px solid ${colors.border}`,
-                borderRadius: '6px',
-                fontSize: '14px',
-                backgroundColor: colors.surface,
-                color: colors.textPrimary
-              }}
+              style={inputStyle}
+              className="input-glass"
             />
           </div>
 
           {/* Day of week */}
           <div>
-            <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: colors.textPrimary, marginBottom: '6px' }}>
+            <label style={{ 
+              display: 'block', 
+              fontSize: '14px', 
+              fontWeight: '600', 
+              color: colors.textPrimary, 
+              marginBottom: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+            }}>
               星期 <span style={{ color: colors.danger }}>*</span>
             </label>
             <select
@@ -233,14 +378,14 @@ const CourseForm = ({ course, onClose, onSubmit }) => {
               onChange={handleChange}
               required
               style={{
-                width: '100%',
-                padding: '10px 12px',
-                border: `1px solid ${colors.border}`,
-                borderRadius: '6px',
-                fontSize: '14px',
-                backgroundColor: colors.surface,
-                color: colors.textPrimary
+                ...inputStyle,
+                appearance: 'none',
+                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236B7280' d='M6 8L1 3h10z'/%3E%3C/svg%3E")`,
+                backgroundRepeat: 'no-repeat',
+                backgroundPosition: 'right 16px center',
+                paddingRight: '40px',
               }}
+              className="input-glass"
             >
               {[1, 2, 3, 4, 5, 6, 7].map(day => (
                 <option key={day} value={day}>{getDayOfWeekText(day)}</option>
@@ -250,7 +395,13 @@ const CourseForm = ({ course, onClose, onSubmit }) => {
 
           {/* Week type */}
           <div>
-            <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: colors.textPrimary, marginBottom: '6px' }}>
+            <label style={{ 
+              display: 'block', 
+              fontSize: '14px', 
+              fontWeight: '600', 
+              color: colors.textPrimary, 
+              marginBottom: '8px' 
+            }}>
               单双周
             </label>
             <select
@@ -258,14 +409,14 @@ const CourseForm = ({ course, onClose, onSubmit }) => {
               value={formData.is_odd_week === null ? '' : formData.is_odd_week}
               onChange={(e) => setFormData({ ...formData, is_odd_week: e.target.value === '' ? null : e.target.value === 'true' })}
               style={{
-                width: '100%',
-                padding: '10px 12px',
-                border: `1px solid ${colors.border}`,
-                borderRadius: '6px',
-                fontSize: '14px',
-                backgroundColor: colors.surface,
-                color: colors.textPrimary
+                ...inputStyle,
+                appearance: 'none',
+                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236B7280' d='M6 8L1 3h10z'/%3E%3C/svg%3E")`,
+                backgroundRepeat: 'no-repeat',
+                backgroundPosition: 'right 16px center',
+                paddingRight: '40px',
               }}
+              className="input-glass"
             >
               <option value="">每周</option>
               <option value="true">单周</option>
@@ -275,10 +426,19 @@ const CourseForm = ({ course, onClose, onSubmit }) => {
 
           {/* Reminder time */}
           <div>
-            <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: colors.textPrimary, marginBottom: '6px' }}>
+            <label style={{ 
+              display: 'block', 
+              fontSize: '14px', 
+              fontWeight: '600', 
+              color: colors.textPrimary, 
+              marginBottom: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+            }}>
               提醒时间 <span style={{ color: colors.danger }}>*</span>
             </label>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <input
                 type="number"
                 name="reminder_time"
@@ -287,36 +447,31 @@ const CourseForm = ({ course, onClose, onSubmit }) => {
                 min="0"
                 required
                 placeholder="请输入提醒时间"
-                style={{
-                  flex: 1,
-                  padding: '10px 12px',
-                  border: `1px solid ${colors.border}`,
-                  borderRadius: '6px',
-                  fontSize: '14px',
-                  backgroundColor: colors.surface,
-                  color: colors.textPrimary
-                }}
+                style={inputStyle}
+                className="input-glass"
               />
-              <span style={{ fontSize: '14px', color: colors.textSecondary, whiteSpace: 'nowrap' }}>分钟</span>
+              <span style={{ fontSize: '14px', color: colors.textSecondary, fontWeight: '500', whiteSpace: 'nowrap' }}>分钟</span>
             </div>
           </div>
         </div>
 
         {/* Action buttons */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '24px', paddingTop: '24px', borderTop: `1px solid ${colors.border}` }}>
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'flex-end', 
+          gap: '12px', 
+          marginTop: '28px', 
+          paddingTop: '24px', 
+          borderTop: `1px solid ${glass.border.light}` 
+        }}>
           <button
             type="button"
             onClick={onClose}
             style={{
-              padding: '10px 20px',
-              backgroundColor: colors.border,
-              color: colors.textPrimary,
-              border: 'none',
-              borderRadius: '6px',
-              fontSize: '14px',
-              fontWeight: '500',
-              cursor: 'pointer'
+              ...glassButtonStyle(),
+              padding: '12px 24px',
             }}
+            className="btn-press"
           >
             取消
           </button>
@@ -324,17 +479,23 @@ const CourseForm = ({ course, onClose, onSubmit }) => {
             type="submit"
             disabled={loading}
             style={{
-              padding: '10px 20px',
-              backgroundColor: loading ? colors.textMuted : colors.primary,
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              fontSize: '14px',
-              fontWeight: '500',
-              cursor: loading ? 'not-allowed' : 'pointer'
+              ...glassButtonStyle(colors.primary, true),
+              padding: '12px 28px',
+              opacity: loading ? 0.7 : 1,
+              cursor: loading ? 'wait' : 'pointer',
             }}
+            className="btn-press"
           >
-            {loading ? '保存中...' : (course ? '保存更改' : '创建课程')}
+            {loading ? (
+              <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 1s linear infinite' }}>
+                  <circle cx="12" cy="12" r="10" strokeDasharray="60" strokeDashoffset="20" />
+                </svg>
+                保存中...
+              </span>
+            ) : (
+              course ? '保存更改' : '创建课程'
+            )}
           </button>
         </div>
       </form>
